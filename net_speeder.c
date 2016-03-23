@@ -6,6 +6,8 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <libnet.h>
+#include <time.h> //用到了time函数 
+
 
 /* default snap length (maximum bytes per packet to capture) */
 #define SNAP_LEN 65535
@@ -22,6 +24,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 void print_usage(void);
 
 
+
 /*
  * print help text
  */
@@ -33,16 +36,23 @@ void print_usage(void) {
 	printf("    filter       Rules to filter packets.\n");
 	printf("\n");
 }
-
+//最大重复包率
+int randSendMax ;
 void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
 	static int count = 1;                  
 	struct libnet_ipv4_hdr *ip;              
+	//随机发送复制包 以一定概率
+	static int randSend ;
+
 
 	libnet_t *libnet_handler = (libnet_t *)args;
 	count++;
 	
 	ip = (struct libnet_ipv4_hdr*)(packet + ETHERNET_H_LEN);
 
+	 randSend = rand() % 100; //产生100的随机数
+	if(randSend<=randSendMax)
+	{
 	if(ip->ip_ttl != SPECIAL_TTL) {
 		ip->ip_ttl = SPECIAL_TTL;
 		int len_written = libnet_adv_write_raw_ipv4(libnet_handler, (u_int8_t *)ip, ntohs(ip->ip_len));
@@ -52,6 +62,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 		}
 	} else {
 		//The packet net_speeder sent. nothing todo
+	}
 	}
 	return;
 }
@@ -75,7 +86,17 @@ int main(int argc, char **argv) {
 	char *filter_rule = NULL;
 	struct bpf_program fp;
 	bpf_u_int32 net, mask;
-
+    srand((unsigned) time(NULL)); //用时间做种，每次产生随机数不一样
+	
+	if (argc > ARGC_NUM) 
+	{
+	randSendMax=atol(argv[3])%100;
+	}
+	else
+	{
+	randSendMax=30;
+	}
+	
 	if (argc == ARGC_NUM) {
 		dev = argv[1];
 		filter_rule = argv[2];
